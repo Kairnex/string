@@ -5,5 +5,4 @@ MONGO_URI = "mongodb+srv://codexkairnex:gm6xSxXfRkusMIug@cluster0.bplk1.mongodb.
 ADMINS = [7416620797]
 ADMIN_ID = [7416620797]# Your Telegram user ID(s)
 LOG_CHANNEL_ID = -1002550719110
-REQUIRED_CHANNEL = "acxbots"  # no @
-REQUIRED_GROUP = "+By6A_c8rZPAwNGZl"
+REQUIRED_CHANNEL = "acxbots"  # n
