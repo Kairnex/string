@@ -1,6 +1,6 @@
-API_ID = 123456  # Your Bot API ID
-API_HASH = "your_api_hash"
-BOT_TOKEN = "your_bot_token"
+API_ID = 21189715  # Your Bot API ID
+API_HASH = "988a9111105fd2f0c5e21c2c2449edfd"
+BOT_TOKEN = "7717292730:AAENCNXzUqNtbdoqb7xQXNLLDnm0HXEzoN4"
 MONGO_URI = "mongodb://localhost:27017"
-ADMINS = [123456789]  # Your Telegram user ID(s)
-LOG_CHANNEL_ID = -1001234567890 
+ADMINS = [7416620797]  # Your Telegram user ID(s)
+LOG_CHANNEL_ID = -1002550719110
