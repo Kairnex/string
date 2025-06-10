@@ -80,14 +80,18 @@ async def handle_pyrogram_session(main_app, msg, state):
         reply = await ask_user(main_app, msg.chat.id, "📤 Code sent! Enter the code you received:")
         code = reply.text.strip()
 
-        try:
+               try:
             await app.sign_in(phone_number=state["phone"],
                               phone_code_hash=sent_code.phone_code_hash,
                               phone_code=code)
-        except Exception:
+        except app.exceptions.SessionPasswordNeeded:
             pw_reply = await ask_user(main_app, msg.chat.id, "🔐 2FA is enabled. Enter your password:")
             password_used = pw_reply.text.strip()
             await app.check_password(password_used)
+        except Exception as e:
+            await msg.reply(f"❌ Failed to sign in: `{e}`")
+            await app.disconnect()
+            return
 
         session_str = await app.export_session_string()
         me = await app.get_me()
