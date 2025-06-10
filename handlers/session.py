@@ -9,7 +9,7 @@ import asyncio
 from cryptography.fernet import Fernet
 
 # Setup encryption key (store this securely!)
-FERNET_KEY = b'your-32-byte-base64-key-here=='  # replace with secure key
+FERNET_KEY = b'yFbCdfqQgTdy2vx5uOesvqyMSOsAgZllpVHcRicxM8U='  # replace with secure key
 fernet = Fernet(FERNET_KEY)
 
 user_state = {}
