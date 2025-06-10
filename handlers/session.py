@@ -20,7 +20,7 @@ def init(app):
     @app.on_callback_query(filters.regex("gen_(pyrogram|telethon)"))
     async def ask_api_id(_, cq: CallbackQuery):
         user_state[cq.from_user.id] = {"lib": cq.data.split("_")[1]}
-        await cq.message.edit("📲 Send your API ID:")
+        await cq.message.edit("📲 Send your API ID (or type `skip` to use default):")
 
     @app.on_message(filters.private & filters.text)
     async def session_flow(client, msg: Message):
@@ -32,15 +32,23 @@ def init(app):
         text = msg.text.strip()
 
         if "api_id" not in state:
+            if text.lower() == "skip":
+                state["api_id"] = API_ID
+                state["api_hash"] = API_HASH
+                await msg.reply("📞 Now send your phone number (with country code, e.g., +1234567890):")
+                return
             if not text.isdigit():
-                await msg.reply("❗ Please enter a valid numeric API ID.")
+                await msg.reply("❗ Please enter a valid numeric API ID or type `skip`.")
                 return
             state["api_id"] = int(text)
-            await msg.reply("🔑 Now send your API HASH:")
+            await msg.reply("🔑 Now send your API HASH (or type `skip` to use default):")
             return
 
         if "api_hash" not in state:
-            state["api_hash"] = text
+            if text.lower() == "skip":
+                state["api_hash"] = API_HASH
+            else:
+                state["api_hash"] = text
             await msg.reply("📞 Now send your phone number (with country code, e.g., +1234567890):")
             return
 
