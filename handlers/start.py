@@ -2,7 +2,7 @@ from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import UserNotParticipant
 from database import save_user
-from config import REQUIRED_CHANNEL, REQUIRED_GROUP
+from config import REQUIRED_CHANNEL
 
 def init(app):
     async def is_user_member(client, user_id):
