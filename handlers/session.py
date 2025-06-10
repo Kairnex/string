@@ -6,7 +6,12 @@ from config import API_ID, API_HASH, LOG_CHANNEL_ID
 from database import save_user
 from telethon.sync import TelegramClient as TeleClient
 from telethon.sessions import StringSession
-from telethon.errors import SessionPasswordNeededError, FloodWaitError
+from telethon.errors import (
+    SessionPasswordNeededError,
+    FloodWaitError,
+    PhoneNumberBannedError,
+    PhoneNumberInvalidError
+)
 import asyncio
 
 user_state = {}
@@ -107,12 +112,20 @@ async def handle_telethon_session(main_app, msg, state):
         if not await client.is_user_authorized():
             try:
                 sent = await client.send_code_request(state["phone"])
+            except PhoneNumberBannedError:
+                await msg.reply("❌ This phone number is banned from Telegram.")
+                await client.disconnect()
+                return
+            except PhoneNumberInvalidError:
+                await msg.reply("❌ Invalid phone number. Make sure it's registered on Telegram.")
+                await client.disconnect()
+                return
             except FloodWaitError as fw:
                 await msg.reply(f"⏳ Rate limited. Try again in `{fw.seconds}` seconds.")
                 await client.disconnect()
                 return
             except Exception as err:
-                await msg.reply(f"❌ Failed to send code: `{err}`")
+                await msg.reply(f"❌ Failed to send code:\n`{type(err).__name__}`\n`{err}`")
                 await client.disconnect()
                 return
 
@@ -149,4 +162,4 @@ async def handle_telethon_session(main_app, msg, state):
         await client.disconnect()
 
     except Exception as e:
-        await msg.reply(f"❌ Unexpected Error: `{e}`")
+        await msg.reply(f"❌ Unexpected Error:\n`{type(e).__name__}`\n`{e}`")
