@@ -106,11 +106,18 @@ async def handle_telethon_session(main_app, msg, state):
         await client.connect()
 
         if not await client.is_user_authorized():
-            await client.send_code_request(state["phone"])
+            try:
+                sent = await client.send_code_request(state["phone"])
+            except Exception as err:
+                await msg.reply(f"❌ Failed to send code: `{err}`")
+                await client.disconnect()
+                return
+
             code_msg = await ask_user(main_app, msg.chat.id, "📤 Code sent! Enter the code you received:")
             code = code_msg.text.strip()
+
             try:
-                await client.sign_in(state["phone"], code)
+                await client.sign_in(phone=state["phone"], code=code)
             except SessionPasswordNeededError:
                 pw_msg = await ask_user(main_app, msg.chat.id, "🔐 2FA is enabled. Enter your password:")
                 await client.sign_in(password=pw_msg.text.strip())
