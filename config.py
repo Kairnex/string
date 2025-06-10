@@ -6,4 +6,4 @@ ADMINS = [7416620797]
 ADMIN_ID = [7416620797]# Your Telegram user ID(s)
 LOG_CHANNEL_ID = -1002550719110
 REQUIRED_CHANNEL = "acxbots"  # no @
-REQUIRED_GROUP = "friend_chat_international"
+REQUIRED_GROUP = "+By6A_c8rZPAwNGZl"
