@@ -42,7 +42,7 @@ def init(app):
         if "phone" not in state:
             state["phone"] = text
             await msg.reply("🔄 Sending login code...")
-            await msg.chat.send_action(ChatAction.TYPING)
+            await msg.reply_chat_action(ChatAction.TYPING)
 
             if state["lib"] == "pyrogram":
                 await handle_pyrogram_session(msg, state)
