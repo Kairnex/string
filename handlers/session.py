@@ -4,7 +4,7 @@ from pyrogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineK
 from telethon.sync import TelegramClient as TeleClient
 from telethon.sessions import StringSession
 from config import API_ID, API_HASH, LOG_CHANNEL_ID
-from database import col  # assumes MongoDB collection is in database.py
+from database import users_col as col  # assumes MongoDB collection is in database.py
 import asyncio
 from cryptography.fernet import Fernet
 
