@@ -4,3 +4,5 @@ BOT_TOKEN = "7717292730:AAENCNXzUqNtbdoqb7xQXNLLDnm0HXEzoN4"
 MONGO_URI = "mongodb+srv://codexkairnex:gm6xSxXfRkusMIug@cluster0.bplk1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 ADMINS = [7416620797]  # Your Telegram user ID(s)
 LOG_CHANNEL_ID = -1002550719110
+REQUIRED_CHANNEL = "acxbots"  # no @
+REQUIRED_GROUP = "friend_chat_international"
