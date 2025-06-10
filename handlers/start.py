@@ -21,11 +21,10 @@ def init(app):
         if not await is_user_member(_, user_id):
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{REQUIRED_CHANNEL}")],
-                [InlineKeyboardButton("👥 Join Group", url=f"https://t.me/{REQUIRED_GROUP}")],
                 [InlineKeyboardButton("✅ I've Joined", callback_data="check_subscription")]
             ])
             await message.reply(
-                "**🔐 Access Denied!**\n\nPlease join the required **channel** and **group** to use this bot.",
+                "**🔐 Access Denied!**\n\nPlease join the required **channel**to use this bot.",
                 reply_markup=keyboard
             )
             return
