@@ -2,14 +2,38 @@
   "name": "Telegram Bot Deployment",
   "description": "A Telegram bot deployed on Heroku",
   "env": {
-    "API_ID": { "required": true },
-    "API_HASH": { "required": true },
-    "BOT_TOKEN": { "required": true },
-    "MONGO_URI": { "required": true },
-    "ADMINS": { "required": true },
-    "ADMIN_ID": { "required": true },
-    "LOG_CHANNEL_ID": { "required": true },
-    "REQUIRED_CHANNEL": { "required": true }
+    "API_ID": {
+      "required": true,
+      "value": "21189715"
+    },
+    "API_HASH": {
+      "required": true,
+      "value": "988a9111105fd2f0c5e21c2c2449edfd"
+    },
+    "BOT_TOKEN": {
+      "required": true,
+      "value": "7076611940:AAHx18yM5TfVllJauMdS7Bbcnj446E9IcCw"
+    },
+    "MONGO_URI": {
+      "required": true,
+      "value": "mongodb+srv://codexkairnex:gm6xSxXfRkusMIug@cluster0.bplk1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    },
+    "ADMINS": {
+      "required": true,
+      "value": "7416620797"
+    },
+    "ADMIN_ID": {
+      "required": true,
+      "value": "7416620797"
+    },
+    "LOG_CHANNEL_ID": {
+      "required": true,
+      "value": "-1002550719110"
+    },
+    "REQUIRED_CHANNEL": {
+      "required": true,
+      "value": "thechattinghub"
+    }
   },
   "formation": {
     "worker": {
