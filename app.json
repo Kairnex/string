@@ -20,19 +20,19 @@
     },
     "ADMINS": {
       "required": true,
-      "value": "7416620797"
+      "value": "8111174619"
     },
     "ADMIN_ID": {
       "required": true,
-      "value": "7416620797"
+      "value": "8111174619"
     },
     "LOG_CHANNEL_ID": {
       "required": true,
-      "value": "-1002550719110"
+      "value": "-1003394845101"
     },
     "REQUIRED_CHANNEL": {
       "required": true,
-      "value": "thechattinghub"
+      "value": "myparardisebots"
     }
   },
   "formation": {
