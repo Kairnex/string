@@ -1,8 +1,12 @@
-API_ID = 21189715  # Your Bot API ID
-API_HASH = "988a9111105fd2f0c5e21c2c2449edfd"
-BOT_TOKEN = "7076611940:AAHx18yM5TfVllJauMdS7Bbcnj446E9IcCw"
-MONGO_URI = "mongodb+srv://codexkairnex:gm6xSxXfRkusMIug@cluster0.bplk1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-ADMINS = [7416620797]
-ADMIN_ID = [7416620797]# Your Telegram user ID(s)
-LOG_CHANNEL_ID = -1002550719110
-REQUIRED_CHANNEL = "thechattinghub"  # n
+import os
+
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MONGO_URI = os.getenv("MONGO_URI")
+
+ADMINS = list(map(int, os.getenv("ADMINS", "").split()))
+ADMIN_ID = list(map(int, os.getenv("ADMIN_ID", "").split()))
+
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
+REQUIRED_CHANNEL = os.getenv("REQUIRED_CHANNEL")
