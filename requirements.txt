@@ -6,3 +6,4 @@ gitpython
 asyncio
 python-dotenv
 requests
+telethon
